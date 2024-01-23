@@ -12,6 +12,23 @@ import os
 import json
 from time import sleep
 from termcolor import colored
+import os
+import pymongo
+import json
+from json import dumps
+from configs.config import *
+
+
+def save_users(mongo_string):
+    client = pymongo.MongoClient(mongo_string)
+    db = client['api']
+    users_collection = db["users"]
+    cursor = users_collection.find()
+    document_list = list(cursor)
+    json_data = dumps(document_list)
+    with open(os.path.join('users.json'), 'w') as file:
+        file.write(json_data)
+
 
 def get_panel_session(panel_url):
     with open('sessions.json', 'r') as f:
@@ -137,6 +154,8 @@ def extract_urls_from_file(file_path):
     return urls
 
 def main():
+    print("________________________ WELCOME __________________________")
+    
     file_path = input("[?] Enter the path of the text file: ")
     urls = extract_urls_from_file(file_path)
 
@@ -148,10 +167,13 @@ def main():
         print(colored("\n[X] No URLs found in the file.", "red"))
 
     # Prompt for username and password
+    
     username = input("\n[?] Enter your username: ")
     password = input("[?] Enter your password: ")
+    
 
     panels_sessions = {}
+    print("________________________ GETTING LOGING SESSIONS FOR PANELS  __________________________")
     for panel_url in urls:
         try:
             panel_url = panel_url.split('//')[1].split(":")[0]
@@ -163,7 +185,7 @@ def main():
             print(colored(f"[X] Error processing panel {panel_url}: {e}", "red"))
 
     with open('sessions.json', 'w') as f:
-        json.dump(panels_sessions, f)
+        json.dump(panels_sessions, f,indent=2)
         print(colored("[✓] Sessions dumped to 'sessions.json'", "green"))
 
     # Ask the user if they want to backup to Telegram
@@ -172,31 +194,60 @@ def main():
     
     if not os.path.exists("saved_dumps"):
         os.mkdir("saved_dumps")
+    print("________________________ DUMPING PANELS IN JSOMN FILE  __________________________")    
     for panel_url in urls:
         panel_url = panel_url.split("//")[1].split(":")[0]
         print(colored('[*] Dumping panel: {} users'.format(panel_url), "yellow"))
         file_name = panel_url+'.json'
         file_path = 'saved_dumps'+'/'+file_name
         with open(file_path,'w') as panel_dump_file:
-            json.dump(dump_single_panel(panel_url=panel_url),panel_dump_file)
+            json.dump(dump_single_panel(panel_url=panel_url),panel_dump_file,indent=2)
         print(colored('[✓] Panel {} Dumped '.format(panel_url), "green"))
-    backup_choice = input("\n[?] Do you want to backup to Telegram? (Enter 0 for Yes, 1 for No): ")    
+    backup_choice = input("\n[?] Do you want to backup to Telegram? (Enter 0 for Yes, 1 for No): ")  
+    
     if backup_choice == '0':
         bot_token = input("[?] Enter your Telegram bot token: ")
         user_id = input("[?] Enter your Telegram user ID: ")
 
-        
+        print("________________________SENDING PANELS DUMP TO USER ID WITH TELEGRAM BOT __________________________")
         print(colored("[*] sending backups to telegram", "yellow")) 
         directory_path = 'saved_dumps'   
-        for filename in os.listdir(directory_path):
-            if os.path.isfile(os.path.join(directory_path, filename)):
-                file_path = os.path.join(directory_path, filename)
-                caption_text = file_name.split('.')[0]
+        for filename1 in os.listdir(directory_path):
+            if os.path.isfile(os.path.join(directory_path, filename1)):
+                file_path = os.path.join(directory_path, filename1)
+                caption_text = filename1.split('.')[0]
                 send_file(file_path, caption_text, bot_token, int(user_id))
                 print(colored('[✓] Panel {} Dumped file sent to user {}'.format(panel_url,user_id), "green"))
-                
+        
+    file_name = panel_url+'.json'
+    file_path = 'saved_dumps'+'/'+file_name   
+    mongo_string = input("[?] Enter the mongo string to get users data from it : ")
+    save_users(mongo_string=mongo_string)
+    all_users_dump = {}  
+    print("________________________ ADDING DB TOKEN TO COLLECTED USERS__________________________")                        
+    print(colored("[*] storing all users in singls file and adding token", "yellow"))   
+    for panel_url in urls:
+            with open(file_path,'r') as panel_dumped_file:
+                for k,v in json.load(panel_dumped_file).items() :
+                    all_users_dump[k] = v
+                    with open('users.json','r') as f :
+                        users_with_sub_and_token=json.load(f)
+                    for user in users_with_sub_and_token:
+                        if k==user['_id']:
+                            
+                            all_users_dump[k]['token'] = user['token']
+    
+    with open('all_users_dump.json','w') as all_users :
+        
+        json.dump(all_users_dump,all_users,indent=2)
+        print(colored('[✓] all users dumped ', "green"))  
+    if backup_choice == '0':     
+        print(colored("[*] sending all users dump with sub token to telegram bot", "yellow"))      
+        send_file('all_users_dump.json', caption_text, bot_token, int(user_id)) 
+        print(colored('[✓] all users dump sent to user {}'.format(user_id), "green"))      
 if __name__ == "__main__":
     main()
+
 
 
 
