@@ -16,7 +16,7 @@ import os
 import pymongo
 import json
 from json import dumps
-from configs.config import *
+
 
 
 def save_users(mongo_string):
