@@ -2,7 +2,7 @@
 
 # Ensure you have the necessary Python packages installed
 pip3 install requests datetime termcolor
-
+ 
 # Run the Python script
 python3 - <<EOF
 import re
